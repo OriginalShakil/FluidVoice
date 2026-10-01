@@ -160,61 +160,100 @@ final class CloudTranscriptionProvider: TranscriptionProvider {
         mimeType: String
     ) async throws -> String {
         let settings = SettingsStore.shared
-        let baseURLString = settings.resolvedCloudASRBaseURL
+        let serviceType = settings.cloudASRServiceType
         let apiKey = settings.resolvedCloudASRAPIKey
         let model = settings.resolvedCloudASRModel
         let language = settings.resolvedCloudASRLanguage
 
-        guard let endpointURL = self.buildEndpointURL(baseURLString: baseURLString) else {
-            throw NSError(
-                domain: "CloudTranscriptionProvider",
-                code: -2,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid API Base URL: \(baseURLString)"]
-            )
-        }
+        let endpointURL: URL
+        let request: URLRequest
 
-        var request = URLRequest(url: endpointURL)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 45.0
+        if serviceType == .cloudflare {
+            let accountID = settings.cloudASRCloudflareAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !accountID.isEmpty else {
+                throw NSError(
+                    domain: "CloudTranscriptionProvider",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Cloudflare Account ID is missing. Please enter it in Settings."]
+                )
+            }
+            guard let url = URL(string: "https://api.cloudflare.com/client/v4/accounts/\(accountID)/ai/run/\(model)") else {
+                throw NSError(
+                    domain: "CloudTranscriptionProvider",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid Cloudflare endpoint URL."]
+                )
+            }
+            endpointURL = url
+            var req = URLRequest(url: endpointURL)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 45.0
+            if !apiKey.isEmpty {
+                req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            }
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if !apiKey.isEmpty {
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
+            var jsonBody: [String: Any] = [
+                "audio": audioData.base64EncodedString()
+            ]
+            if let language, !language.isEmpty, language.lowercased() != "auto" {
+                jsonBody["language"] = language
+            }
+            req.httpBody = try JSONSerialization.data(withJSONObject: jsonBody)
+            request = req
+        } else {
+            let baseURLString = settings.resolvedCloudASRBaseURL
+            guard let url = self.buildEndpointURL(baseURLString: baseURLString) else {
+                throw NSError(
+                    domain: "CloudTranscriptionProvider",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid API Base URL: \(baseURLString)"]
+                )
+            }
+            endpointURL = url
+            var req = URLRequest(url: endpointURL)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 45.0
 
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            if !apiKey.isEmpty {
+                req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            }
 
-        // Build multipart body
-        var body = Data()
+            let boundary = "Boundary-\(UUID().uuidString)"
+            req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
-        // 1. Model field
-        body.append(contentsOf: "--\(boundary)\r\n".utf8)
-        body.append(contentsOf: "Content-Disposition: form-data; name=\"model\"\r\n\r\n".utf8)
-        body.append(contentsOf: "\(model)\r\n".utf8)
+            // Build multipart body
+            var body = Data()
 
-        // 2. Response format
-        body.append(contentsOf: "--\(boundary)\r\n".utf8)
-        body.append(contentsOf: "Content-Disposition: form-data; name=\"response_format\"\r\n\r\n".utf8)
-        body.append(contentsOf: "json\r\n".utf8)
-
-        // 3. Language field (omitted for automatic language detection on the go!)
-        if let language, !language.isEmpty, language.lowercased() != "auto" {
+            // 1. Model field
             body.append(contentsOf: "--\(boundary)\r\n".utf8)
-            body.append(contentsOf: "Content-Disposition: form-data; name=\"language\"\r\n\r\n".utf8)
-            body.append(contentsOf: "\(language)\r\n".utf8)
+            body.append(contentsOf: "Content-Disposition: form-data; name=\"model\"\r\n\r\n".utf8)
+            body.append(contentsOf: "\(model)\r\n".utf8)
+
+            // 2. Response format
+            body.append(contentsOf: "--\(boundary)\r\n".utf8)
+            body.append(contentsOf: "Content-Disposition: form-data; name=\"response_format\"\r\n\r\n".utf8)
+            body.append(contentsOf: "json\r\n".utf8)
+
+            // 3. Language field (omitted for automatic language detection on the go!)
+            if let language, !language.isEmpty, language.lowercased() != "auto" {
+                body.append(contentsOf: "--\(boundary)\r\n".utf8)
+                body.append(contentsOf: "Content-Disposition: form-data; name=\"language\"\r\n\r\n".utf8)
+                body.append(contentsOf: "\(language)\r\n".utf8)
+            }
+
+            // 4. File data
+            body.append(contentsOf: "--\(boundary)\r\n".utf8)
+            body.append(contentsOf: "Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".utf8)
+            body.append(contentsOf: "Content-Type: \(mimeType)\r\n\r\n".utf8)
+            body.append(audioData)
+            body.append(contentsOf: "\r\n".utf8)
+
+            // Closing boundary
+            body.append(contentsOf: "--\(boundary)--\r\n".utf8)
+            req.httpBody = body
+            request = req
         }
-
-        // 4. File data
-        body.append(contentsOf: "--\(boundary)\r\n".utf8)
-        body.append(contentsOf: "Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".utf8)
-        body.append(contentsOf: "Content-Type: \(mimeType)\r\n\r\n".utf8)
-        body.append(audioData)
-        body.append(contentsOf: "\r\n".utf8)
-
-        // Closing boundary
-        body.append(contentsOf: "--\(boundary)--\r\n".utf8)
-
-        request.httpBody = body
 
         DebugLogger.shared.info(
             "CloudTranscriptionProvider: Sending \(audioData.count) bytes to \(endpointURL.absoluteString) [model=\(model), language=\(language ?? "auto")]",
@@ -233,10 +272,21 @@ final class CloudTranscriptionProvider: TranscriptionProvider {
 
         if httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 {
             let errorText: String
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let errorObj = json["error"] as? [String: Any],
-               let message = errorObj["message"] as? String {
-                errorText = message
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let errors = json["errors"] as? [[String: Any]],
+                   let firstErr = errors.first,
+                   let message = firstErr["message"] as? String {
+                    errorText = message
+                } else if let errorObj = json["error"] as? [String: Any],
+                          let message = errorObj["message"] as? String {
+                    errorText = message
+                } else if let message = json["message"] as? String {
+                    errorText = message
+                } else if let rawString = String(data: data, encoding: .utf8), !rawString.isEmpty {
+                    errorText = rawString
+                } else {
+                    errorText = "HTTP \(httpResponse.statusCode)"
+                }
             } else if let rawString = String(data: data, encoding: .utf8), !rawString.isEmpty {
                 errorText = rawString
             } else {
@@ -249,8 +299,26 @@ final class CloudTranscriptionProvider: TranscriptionProvider {
             )
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let text = json["text"] as? String else {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(
+                domain: "CloudTranscriptionProvider",
+                code: -4,
+                userInfo: [NSLocalizedDescriptionKey: "Could not parse JSON response from AI provider."]
+            )
+        }
+
+        // Support standard {"text": "..."} and Cloudflare {"result": {"text": "..."}}
+        let extractedText: String?
+        if let resultObj = json["result"] as? [String: Any],
+           let text = resultObj["text"] as? String {
+            extractedText = text
+        } else if let text = json["text"] as? String {
+            extractedText = text
+        } else {
+            extractedText = nil
+        }
+
+        guard let text = extractedText else {
             throw NSError(
                 domain: "CloudTranscriptionProvider",
                 code: -4,

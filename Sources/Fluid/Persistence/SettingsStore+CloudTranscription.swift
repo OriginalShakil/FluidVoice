@@ -6,6 +6,7 @@ import Foundation
 
 enum CloudASRServiceType: String, CaseIterable, Identifiable, Codable {
     case groq = "groq"
+    case cloudflare = "cloudflare"
     case openai = "openai"
     case custom = "custom"
 
@@ -13,7 +14,8 @@ enum CloudASRServiceType: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .groq: return "Groq (Lightning Fast Whisper)"
+        case .groq: return "Groq (Whisper Large v3 Turbo)"
+        case .cloudflare: return "Cloudflare Workers AI (Whisper Large v3 Turbo)"
         case .openai: return "OpenAI Whisper"
         case .custom: return "Custom Endpoint (Self-Hosted / Compatible)"
         }
@@ -22,6 +24,7 @@ enum CloudASRServiceType: String, CaseIterable, Identifiable, Codable {
     var defaultBaseURL: String {
         switch self {
         case .groq: return "https://api.groq.com/openai/v1"
+        case .cloudflare: return "https://api.cloudflare.com/client/v4"
         case .openai: return "https://api.openai.com/v1"
         case .custom: return "http://localhost:8000/v1"
         }
@@ -30,6 +33,7 @@ enum CloudASRServiceType: String, CaseIterable, Identifiable, Codable {
     var defaultModel: String {
         switch self {
         case .groq: return "whisper-large-v3-turbo"
+        case .cloudflare: return "@cf/openai/whisper-large-v3-turbo"
         case .openai: return "whisper-1"
         case .custom: return "whisper-large-v3-turbo"
         }
@@ -39,6 +43,8 @@ enum CloudASRServiceType: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .groq:
             return ["whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"]
+        case .cloudflare:
+            return ["@cf/openai/whisper-large-v3-turbo", "@cf/openai/whisper"]
         case .openai:
             return ["whisper-1"]
         case .custom:
@@ -55,6 +61,7 @@ extension SettingsStore {
         static let customModel = "CloudASRCustomModel"
         static let apiKeyOverride = "CloudASRAPIKeyOverride"
         static let language = "CloudASRLanguage"
+        static let cloudflareAccountID = "CloudASRCloudflareAccountID"
     }
 
     var cloudASRServiceType: CloudASRServiceType {
@@ -62,7 +69,7 @@ extension SettingsStore {
             guard let raw = UserDefaults.standard.string(forKey: CloudASRKeys.serviceType),
                   let type = CloudASRServiceType(rawValue: raw)
             else {
-                return .groq
+                return .cloudflare
             }
             return type
         }
@@ -79,6 +86,16 @@ extension SettingsStore {
         set {
             objectWillChange.send()
             UserDefaults.standard.set(newValue, forKey: CloudASRKeys.selectedModel)
+        }
+    }
+
+    var cloudASRCloudflareAccountID: String {
+        get {
+            UserDefaults.standard.string(forKey: CloudASRKeys.cloudflareAccountID) ?? ""
+        }
+        set {
+            objectWillChange.send()
+            UserDefaults.standard.set(newValue, forKey: CloudASRKeys.cloudflareAccountID)
         }
     }
 
@@ -127,7 +144,7 @@ extension SettingsStore {
 
     var resolvedCloudASRBaseURL: String {
         switch cloudASRServiceType {
-        case .groq, .openai:
+        case .groq, .cloudflare, .openai:
             return cloudASRServiceType.defaultBaseURL
         case .custom:
             let custom = cloudASRCustomBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -137,7 +154,7 @@ extension SettingsStore {
 
     var resolvedCloudASRModel: String {
         switch cloudASRServiceType {
-        case .groq, .openai:
+        case .groq, .cloudflare, .openai:
             return cloudASRSelectedModel
         case .custom:
             let custom = cloudASRCustomModel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -156,7 +173,7 @@ extension SettingsStore {
             return getAPIKey(for: "groq") ?? ""
         case .openai:
             return getAPIKey(for: "openai") ?? ""
-        case .custom:
+        case .cloudflare, .custom:
             return ""
         }
     }
@@ -173,6 +190,9 @@ extension SettingsStore {
         switch cloudASRServiceType {
         case .groq, .openai:
             return !resolvedCloudASRAPIKey.isEmpty
+        case .cloudflare:
+            return !cloudASRCloudflareAccountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !resolvedCloudASRAPIKey.isEmpty
         case .custom:
             return !resolvedCloudASRBaseURL.isEmpty
         }

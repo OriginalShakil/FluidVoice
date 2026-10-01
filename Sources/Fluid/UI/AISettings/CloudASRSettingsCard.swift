@@ -15,6 +15,7 @@ struct CloudASRSettingsCard: View {
 
     private let popularLanguages: [(code: String, name: String)] = [
         ("auto", "Auto-Detect (Any Language On The Go)"),
+        ("bn", "Bengali / Bangla (বাংলা)"),
         ("en", "English"),
         ("es", "Spanish"),
         ("fr", "French"),
@@ -25,7 +26,6 @@ struct CloudASRSettingsCard: View {
         ("ja", "Japanese"),
         ("ko", "Korean"),
         ("ar", "Arabic"),
-        ("bn", "Bengali"),
         ("hi", "Hindi"),
         ("ru", "Russian"),
         ("nl", "Dutch"),
@@ -75,7 +75,7 @@ struct CloudASRSettingsCard: View {
                         }
                     }
 
-                    Text("Transcribe voice directly via AI providers (Groq, OpenAI, or Custom) with zero-config language auto-detection.")
+                    Text("Transcribe voice directly via AI providers (Cloudflare, Groq, OpenAI, or Custom) with zero-config language auto-detection.")
                         .font(theme.typography.bodySmall)
                         .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 }
@@ -121,7 +121,15 @@ struct CloudASRSettingsCard: View {
                 }
                 .pickerStyle(.segmented)
 
-                if settings.cloudASRServiceType == .groq {
+                if settings.cloudASRServiceType == .cloudflare {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gift.fill")
+                            .foregroundStyle(.purple)
+                        Text("Cloudflare Workers AI includes 10,000 free Neurons/day. Whisper Large v3 Turbo natively supports Bangla.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    }
+                } else if settings.cloudASRServiceType == .groq {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles")
                             .foregroundStyle(.orange)
@@ -129,6 +137,25 @@ struct CloudASRSettingsCard: View {
                             .font(.system(size: 11))
                             .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     }
+                }
+            }
+
+            // Cloudflare Specific Settings: Account ID
+            if settings.cloudASRServiceType == .cloudflare {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Cloudflare Account ID")
+                            .font(theme.typography.bodySmallStrong)
+                            .foregroundStyle(Color(nsColor: .labelColor))
+
+                        Spacer()
+
+                        Link("Find Account ID in Cloudflare Dashboard ↗", destination: URL(string: "https://dash.cloudflare.com/?to=/:account/workers-ai")!)
+                            .font(.system(size: 11))
+                    }
+
+                    TextField("Enter your Cloudflare Account ID (hex string from dashboard)", text: $settings.cloudASRCloudflareAccountID)
+                        .textFieldStyle(.roundedBorder)
                 }
             }
 
@@ -211,10 +238,10 @@ struct CloudASRSettingsCard: View {
                 }
             }
 
-            // API Key Section
+            // API Key / Token Section
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("API Key")
+                    Text(settings.cloudASRServiceType == .cloudflare ? "Cloudflare API Token" : "API Key")
                         .font(theme.typography.bodySmallStrong)
                         .foregroundStyle(Color(nsColor: .labelColor))
 
@@ -231,8 +258,13 @@ struct CloudASRSettingsCard: View {
                     }
                 }
 
-                SecureField("Enter \(settings.cloudASRServiceType.displayName) API Key", text: $settings.cloudASRAPIKeyOverride)
-                    .textFieldStyle(.roundedBorder)
+                SecureField(
+                    settings.cloudASRServiceType == .cloudflare
+                        ? "Enter Cloudflare API Token (with Workers AI Read/Edit permission)"
+                        : "Enter \(settings.cloudASRServiceType.displayName) API Key",
+                    text: $settings.cloudASRAPIKeyOverride
+                )
+                .textFieldStyle(.roundedBorder)
 
                 if settings.cloudASRAPIKeyOverride.isEmpty && !settings.resolvedCloudASRAPIKey.isEmpty {
                     Text("Using saved API key from AI Settings for \(settings.cloudASRServiceType.rawValue.capitalized).")

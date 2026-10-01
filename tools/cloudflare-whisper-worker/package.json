@@ -1,0 +1,13 @@
+{
+  "name": "fluidvoice-whisper-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers AI Whisper Large v3 Turbo OpenAI-Compatible Transcription Proxy",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.100.0"
+  }
+}
