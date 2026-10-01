@@ -986,6 +986,9 @@ final class ASRService: ObservableObject {
     private var appleSpeechProvider: AppleSpeechProvider?
     /// Stored as Any? because @available cannot be applied to stored properties
     private var _appleSpeechAnalyzerProvider: Any?
+    // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+    private var cloudTranscriptionProvider: CloudTranscriptionProvider?
+    // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
 
     /// Prevent concurrent provider.prepare() calls (download/load) from overlapping.
     /// Subsequent callers await the in-flight task.
@@ -1095,6 +1098,10 @@ final class ASRService: ObservableObject {
         let model = SettingsStore.shared.selectedSpeechModel
 
         switch model {
+        // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+        case .cloudAI:
+            return self.getCloudTranscriptionProvider()
+        // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
         case .appleSpeechAnalyzer:
             if #available(macOS 26.0, *) {
                 return self.getAppleSpeechAnalyzerProvider()
@@ -1182,6 +1189,18 @@ final class ASRService: ObservableObject {
         return provider
     }
 
+    // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+    private func getCloudTranscriptionProvider() -> CloudTranscriptionProvider {
+        if let existing = self.cloudTranscriptionProvider {
+            return existing
+        }
+        let provider = CloudTranscriptionProvider()
+        self.cloudTranscriptionProvider = provider
+        DebugLogger.shared.info("ASRService: Created CloudTranscriptionProvider", source: "ASRService")
+        return provider
+    }
+    // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
+
     @available(macOS 26.0, *)
     private func getAppleSpeechAnalyzerProvider() -> AppleSpeechAnalyzerProvider {
         if let existing = _appleSpeechAnalyzerProvider as? AppleSpeechAnalyzerProvider {
@@ -1225,6 +1244,10 @@ final class ASRService: ObservableObject {
     /// Used for downloading models without switching the active model.
     private func getProvider(for model: SettingsStore.SpeechModel) -> TranscriptionProvider {
         switch model {
+        // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+        case .cloudAI:
+            return CloudTranscriptionProvider()
+        // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
         case .appleSpeechAnalyzer:
             if #available(macOS 26.0, *) {
                 return AppleSpeechAnalyzerProvider()

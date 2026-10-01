@@ -41,6 +41,10 @@ extension VoiceEngineSettingsView {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 14) {
+                        // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+                        CloudASRSettingsCard(settings: self.settings, theme: self.theme)
+                        // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
+
                         HStack(spacing: 6) {
                             Image(systemName: "info.circle")
                                 .font(self.theme.typography.bodySmall)
@@ -387,7 +391,7 @@ extension VoiceEngineSettingsView {
                         .disabled(self.viewModel.areSpeechModelActionsBlocked)
                     }
 
-                    if !model.usesAppleLogo {
+                    if !model.usesAppleLogo && model != .cloudAI {
                         if isSelected {
                             Button {
                                 self.viewModel.deleteSpeechModel(model)
@@ -475,7 +479,11 @@ extension VoiceEngineSettingsView {
 
     @ViewBuilder
     private func speechModelLanguagePicker(for model: SettingsStore.SpeechModel) -> some View {
-        if model.isWhisperModel {
+        if model == .cloudAI {
+            // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+            self.cloudAILanguageChipButton
+            // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
+        } else if model.isWhisperModel {
             self.whisperLanguagePickerButton
         } else if model == .cohereTranscribeSixBit {
             Menu {
@@ -499,6 +507,14 @@ extension VoiceEngineSettingsView {
             self.nemotronLanguagePickerButton
         }
     }
+
+    // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+    private var cloudAILanguageChipButton: some View {
+        let code = self.settings.cloudASRLanguage
+        let label = (code.lowercased() == "auto" || code.isEmpty) ? "Auto-Detect" : code.uppercased()
+        return self.languageChipLabel(label)
+    }
+    // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
 
     private var whisperLanguagePickerButton: some View {
         Button {

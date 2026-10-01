@@ -753,15 +753,22 @@ struct DictionaryRibbon: Shape {
         let spread = self.strand / 4
         return Path { path in
             for sample in 0...180 {
-                let angle = Double(sample) / 180 * .pi * 2
-                let center = 1 + sin(angle * 3 + offset + self.phase) * 0.05 + sin(angle * 2 + offset * 0.6 - self.phase) * 0.03 + self.energy * 0.02
+                // MARK: - [Fork Customization: Compiler Timeout Fix]
+                // Purpose: Break up arithmetic expression into typed sub-expressions to prevent Swift compiler type-check timeout error
+                let sampleFraction: Double = Double(sample) / 180.0
+                let angle: Double = sampleFraction * .pi * 2.0
+                let wave1: Double = sin(angle * 3.0 + offset + self.phase) * 0.05
+                let wave2: Double = sin(angle * 2.0 + offset * 0.6 - self.phase) * 0.03
+                let center: Double = 1.0 + wave1 + wave2 + (self.energy * 0.02)
                 // The sheet twists through a loose pinch, then opens into a wide veil; speech opens it further.
-                let width = cos(angle * lobes + offset + drift) * (0.11 + self.energy * 0.05) + 0.018
-                let distance = radius * (center + spread * width)
+                let wave3: Double = cos(angle * lobes + offset + drift)
+                let width: Double = wave3 * (0.11 + self.energy * 0.05) + 0.018
+                let distance: Double = Double(radius) * (center + spread * width)
                 let point = CGPoint(
-                    x: rect.midX + cos(angle) * distance,
-                    y: rect.midY + sin(angle) * distance
+                    x: rect.midX + CGFloat(cos(angle) * distance),
+                    y: rect.midY + CGFloat(sin(angle) * distance)
                 )
+                // MARK: - [End Fork Customization: Compiler Timeout Fix]
                 if sample == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
             path.closeSubpath()

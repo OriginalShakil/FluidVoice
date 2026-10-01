@@ -725,6 +725,19 @@ nonisolated enum MeetingExternalReferenceTrialAAutorun {
             relationship: "independent PTS origins; no defensible clock mapping",
             reason: "per-buffer PTS cannot establish an acoustic capture/reference mapping"
         )
+        // MARK: - [Fork Customization: Compiler Timeout Fix]
+        // Purpose: Replace massive inline array concatenation with imperative appends to avoid Swift type-checker timeout
+        var reasons: [String] = ["diagnostic-only", "no app-owned playback", "independent clocks; acoustic delay unknown"]
+        if (reference.peak ?? 0) < 0.001 { reasons.append("reference below excitation floor") }
+        if !postCaptureRouteConfirmed { reasons.append("capture-time route changed or became unreadable") }
+        if !volumeUnchanged { reasons.append("output volume changed during capture") }
+        if (measuredCombinedPeak ?? .infinity) > 0.15 { reasons.append("measured combined peak exceeded 0.15") }
+        if !(reference.timingValid && microphoneReport.timingValid) { reasons.append("timing invalid or bounded collector dropped audio") }
+        if streamDelegate.errorCount != 0 { reasons.append("ScreenCaptureKit stream stopped with error") }
+        if stopErrorCount != 0 { reasons.append("stream stop or output cleanup failed") }
+        if !targetProcessStable { reasons.append("target process became unstable") }
+        if !voiceProcessingReadbackValid { reasons.append("VPIO engine/voice-processing device readback was not verified") }
+
         let report = MeetingExternalReferenceTrialAReport(
             schemaVersion: MeetingExternalReferenceTrialAReport.currentSchemaVersion,
             targetBundleID: targetBundleID,
@@ -756,17 +769,9 @@ nonisolated enum MeetingExternalReferenceTrialAAutorun {
             persisted: false,
             captureValid: captureValid,
             acousticMeasurementValid: false,
-            reasons: ["diagnostic-only", "no app-owned playback", "independent clocks; acoustic delay unknown"]
-                + ((reference.peak ?? 0) >= 0.001 ? [] : ["reference below excitation floor"])
-                + (postCaptureRouteConfirmed ? [] : ["capture-time route changed or became unreadable"])
-                + (volumeUnchanged ? [] : ["output volume changed during capture"])
-                + ((measuredCombinedPeak ?? .infinity) <= 0.15 ? [] : ["measured combined peak exceeded 0.15"])
-                + (reference.timingValid && microphoneReport.timingValid ? [] : ["timing invalid or bounded collector dropped audio"])
-                + (streamDelegate.errorCount == 0 ? [] : ["ScreenCaptureKit stream stopped with error"])
-                + (stopErrorCount == 0 ? [] : ["stream stop or output cleanup failed"])
-                + (targetProcessStable ? [] : ["target process became unstable"])
-                + (voiceProcessingReadbackValid ? [] : ["VPIO engine/voice-processing device readback was not verified"])
+            reasons: reasons
         )
+        // MARK: - [End Fork Customization: Compiler Timeout Fix]
         do {
             let data = try JSONEncoder.sorted.encode(report)
             // Diagnostic JSON is emitted as UTF-8; decoding keeps the report output nonoptional.

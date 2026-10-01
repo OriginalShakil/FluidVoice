@@ -5036,6 +5036,11 @@ final class SettingsStore: ObservableObject {
         case whisperLargeTurbo = "whisper-large-turbo"
         case whisperLarge = "whisper-large"
 
+        // MARK: - [Fork Customization: Direct AI Provider Voice-to-Text]
+        // Purpose: Direct speech-to-text via Cloud AI (Groq/OpenAI/Custom) with auto-detect multilingual support
+        case cloudAI = "cloud-ai"
+        // MARK: - [End Fork Customization: Direct AI Provider Voice-to-Text]
+
         var id: String {
             rawValue
         }
@@ -5044,6 +5049,7 @@ final class SettingsStore: ObservableObject {
 
         var displayName: String {
             switch self {
+            case .cloudAI: return "Cloud AI Speech Transcriber"
             case .parakeetTDT: return "Parakeet TDT v3 (Multilingual)"
             case .parakeetTDTv2: return "Parakeet TDT v2 (English Only)"
             case .parakeetRealtime: return "Parakeet Flash (Beta)"
@@ -5065,6 +5071,7 @@ final class SettingsStore: ObservableObject {
 
         var languageSupport: String {
             switch self {
+            case .cloudAI: return "100+ Languages (Auto-Detect On The Go)"
             case .parakeetTDT:
                 return "25 Languages"
             case .parakeetTDTv2: return "English Only (Higher Accuracy)"
@@ -5081,6 +5088,7 @@ final class SettingsStore: ObservableObject {
 
         var downloadSize: String {
             switch self {
+            case .cloudAI: return "Cloud / Instant"
             case .parakeetTDT: return "~460.9 MiB"
             case .parakeetTDTv2: return "~442.9 MiB"
             case .parakeetRealtime: return "~428.4 MiB"
@@ -5102,6 +5110,7 @@ final class SettingsStore: ObservableObject {
 
         var expectedDownloadBytes: Int64 {
             switch self {
+            case .cloudAI: return 0
             case .parakeetTDT: return 483_288_717
             case .parakeetTDTv2: return 464_421_712
             case .parakeetRealtime: return 449_190_189
@@ -5128,7 +5137,7 @@ final class SettingsStore: ObservableObject {
 
         var isWhisperModel: Bool {
             switch self {
-            case .parakeetTDT, .parakeetTDTv2, .parakeetRealtime, .qwen3Asr, .cohereTranscribeSixBit, .nemotronOffline, .nemotronStreaming, .nemotronStreaming320, .appleSpeech,
+            case .cloudAI, .parakeetTDT, .parakeetTDTv2, .parakeetRealtime, .qwen3Asr, .cohereTranscribeSixBit, .nemotronOffline, .nemotronStreaming, .nemotronStreaming320, .appleSpeech,
                  .appleSpeechAnalyzer: return false
             default: return true
             }
@@ -5244,6 +5253,7 @@ final class SettingsStore: ObservableObject {
         /// Human-readable marketing name for the card UI
         var humanReadableName: String {
             switch self {
+            case .cloudAI: return "AI Cloud Transcribe - Any Language"
             case .parakeetTDT: return "Blazing Fast - Multilingual"
             case .parakeetTDTv2: return "Blazing Fast - English"
             case .parakeetRealtime: return "Flash Dictation"
@@ -5266,6 +5276,8 @@ final class SettingsStore: ObservableObject {
         /// One-line description for the card UI
         var cardDescription: String {
             switch self {
+            case .cloudAI:
+                return "Fast direct voice-to-text through Groq, OpenAI, or custom STT. Automatically detects whatever language you speak on the go."
             case .parakeetTDT:
                 return "Fast multilingual transcription. Supports Bulgarian, Croatian, Czech, Danish, " +
                     "Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, " +
@@ -5307,6 +5319,8 @@ final class SettingsStore: ObservableObject {
         /// Minimum recommended RAM in GB for this model to run safely
         var requiredMemoryGB: Double {
             switch self {
+            case .cloudAI:
+                return 1.0
             case .parakeetTDT, .parakeetTDTv2, .parakeetRealtime:
                 return 4.0
             case .qwen3Asr:
@@ -5351,6 +5365,7 @@ final class SettingsStore: ObservableObject {
         /// Speed rating (1-5, higher is faster)
         var speedRating: Int {
             switch self {
+            case .cloudAI: return 5
             case .parakeetTDT: return 5
             case .parakeetTDTv2: return 5
             case .parakeetRealtime: return 5
@@ -5372,6 +5387,7 @@ final class SettingsStore: ObservableObject {
         /// Accuracy rating (1-5, higher is more accurate)
         var accuracyRating: Int {
             switch self {
+            case .cloudAI: return 5
             case .parakeetTDT: return 5
             case .parakeetTDTv2: return 5
             case .parakeetRealtime: return 4
@@ -5393,6 +5409,7 @@ final class SettingsStore: ObservableObject {
         /// Exact speed percentage (0.0 - 1.0) for the liquid bars
         var speedPercent: Double {
             switch self {
+            case .cloudAI: return 0.95
             case .parakeetTDT: return 1.0
             case .parakeetTDTv2: return 1.0
             case .parakeetRealtime: return 1.0
@@ -5414,6 +5431,7 @@ final class SettingsStore: ObservableObject {
         /// Exact accuracy percentage (0.0 - 1.0) for the liquid bars
         var accuracyPercent: Double {
             switch self {
+            case .cloudAI: return 0.98
             case .parakeetTDT: return 0.92
             case .parakeetTDTv2: return 0.96
             case .parakeetRealtime: return 0.75
@@ -5435,6 +5453,7 @@ final class SettingsStore: ObservableObject {
         /// Optional badge text for the card (e.g., "FluidVoice Pick")
         var badgeText: String? {
             switch self {
+            case .cloudAI: return "Cloud AI"
             case .parakeetTDT: return "FluidVoice Pick"
             case .parakeetTDTv2: return "FluidVoice Pick"
             case .parakeetRealtime: return "Beta"
@@ -5460,8 +5479,8 @@ final class SettingsStore: ObservableObject {
         /// Large Whisper models are too slow for streaming, so they only do final transcription on stop.
         var supportsStreaming: Bool {
             switch self {
-            case .qwen3Asr, .whisperMedium, .whisperLargeTurbo, .whisperLarge:
-                return false // Too slow for real-time chunk processing
+            case .cloudAI, .qwen3Asr, .whisperMedium, .whisperLargeTurbo, .whisperLarge:
+                return false // Cloud models transcribe final audio on stop
             default:
                 return true // All other models support streaming
             }
@@ -5522,6 +5541,8 @@ final class SettingsStore: ObservableObject {
         /// Which provider this model belongs to
         var provider: Provider {
             switch self {
+            case .cloudAI:
+                return .openai
             case .parakeetTDT, .parakeetTDTv2, .parakeetRealtime, .nemotronOffline, .nemotronStreaming, .nemotronStreaming320:
                 return .nvidia
             case .appleSpeech, .appleSpeechAnalyzer:
@@ -5543,6 +5564,8 @@ final class SettingsStore: ObservableObject {
         /// Whether this model is built-in or already downloaded on disk
         var isInstalled: Bool {
             switch self {
+            case .cloudAI:
+                return true
             case .appleSpeech, .appleSpeechAnalyzer:
                 return true
             case .parakeetTDT:
@@ -5651,6 +5674,8 @@ final class SettingsStore: ObservableObject {
         /// Brand/provider name for the model (NVIDIA, Apple, OpenAI)
         var brandName: String {
             switch self {
+            case .cloudAI:
+                return "AI Cloud"
             case .parakeetTDT, .parakeetTDTv2, .parakeetRealtime, .nemotronOffline, .nemotronStreaming, .nemotronStreaming320:
                 return "NVIDIA"
             case .qwen3Asr:
@@ -5675,6 +5700,8 @@ final class SettingsStore: ObservableObject {
         /// Brand color for the provider badge
         var brandColorHex: String {
             switch self {
+            case .cloudAI:
+                return "#8E44AD"
             case .parakeetTDT, .parakeetTDTv2, .parakeetRealtime, .nemotronOffline, .nemotronStreaming, .nemotronStreaming320:
                 return "#76B900"
             case .qwen3Asr:
